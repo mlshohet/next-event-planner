@@ -1,5 +1,4 @@
 import { Fragment } from 'react';
-import { useRouter } from 'next/router';
 
 import EventSummary from '../../components/event-detail/event-summary'
 import EventLogistics from '../../components/event-detail/event-logistics';
@@ -7,22 +6,17 @@ import EventContent from '../../components/event-detail/event-content';
 import Button from '../../components/ui/button';
 import ErrorAlert from '../../components/ui/error-alert';
 
-import { getEventById } from '../../data';
+import { getData, getFeaturedEvents } from '../../utils/api-util';
 
 const EventDetailsPage = props => {
-	const router = useRouter();
 
-	const eventId = router.query.eventId;
-	const event = getEventById(eventId);
+	const { loadedEvent } = props;
 
-	if (!event) {
+	if (!loadedEvent) {
 		return (
 			<Fragment>
-				<ErrorAlert>
-					<p>No events found.</p>
-				</ErrorAlert>
-				<div className='center'>
-					<Button link='/events' >Back to Events</Button>
+				<div className="center">
+					<p>Loading...</p>
 				</div>
 			</Fragment>
 		);
@@ -30,21 +24,57 @@ const EventDetailsPage = props => {
 
 	return (
 		<Fragment>
-			<EventSummary 
-				title={event.title}
+			<EventSummary title={loadedEvent.title} />
+			<EventLogistics 
+				date={loadedEvent.date}
+				address={loadedEvent.location}
+				image={loadedEvent.image}
+				imageAlt={loadedEvent.title}
 			/>
-			<EventLogistics
-				date={event.date}
-				address={event.location}
-				image={event.image}
-				imageAlt={event.title}
-			/>
-			<EventContent>
-				<p>{event.description}</p>
+			<EventContent>			
+				<p>{loadedEvent.description}</p>
 			</EventContent>
 		</Fragment>
-
 	);
 };
+
+export async function getStaticProps(context) {
+	const { params } = context;
+	console.log("Params: ",params);
+
+	const eventId = params.eventId;
+
+	const data = await getData();
+
+  	const event = data.find(event =>
+  		event.id === eventId
+  	);
+
+  	console.log('event ID: ', event);
+
+  	return {
+  		props: {
+  			loadedEvent: event
+  		},
+  		revalidate: 60 // every 30 seconds a page regenerates for a new request
+  	};
+}
+
+export async function getStaticPaths() {
+	const events = await getFeaturedEvents();
+
+	const ids = events.map(event => event.id);
+
+	const pathsWithParams = ids.map(id => ({
+	 	params: {
+	 		eventId: id
+	 	}
+	 }));
+ 	
+	return {
+			paths: pathsWithParams,
+			fallback: true // there are more pages that were registered with static paths
+		};
+}
 
 export default EventDetailsPage;
